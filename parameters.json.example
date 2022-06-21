@@ -1,0 +1,56 @@
+[  
+    {
+        "id": "setup",
+        "boot": "0",
+        "value": "0",
+        "significantFigures": 1
+    },
+    {
+        "id": "title",
+        "boot": ["FV", "MB", "LL", "AA", "KH", "NU", "NU", "NU", "NU", "NU"],
+        "values": ["FV", "MB", "LL", "AA", "KH", "NU", "NU", "NU", "NU", "NU"],
+        "significantFigures": 2
+    },
+    {
+        "id": "desired-weight",
+        "boot": ["110", "103", "105", "120", "113", "100", "100", "100", "100", "100"],
+        "values": ["110", "103", "105", "120", "113", "100", "100", "100", "100", "100"],
+        "significantFigures": 3
+    },
+    {
+        "id": "weight-tolerance",
+        "boot": "5",
+        "value": "5",
+        "significantFigures": 1
+    },
+    {
+        "id": "motor-power",
+        "boot": ["99", "70", "70", "99", "99", "99", "99", "99", "99", "99"],
+        "values": ["99", "70", "70", "99", "99", "99", "99", "99", "99", "99"],
+        "significantFigures": 2
+    },
+    {
+        "id": "scale-factor",
+        "boot": "0290",
+        "value": "0290",
+        "significantFigures": 4
+    },
+    {
+        "id": "injector-transient",
+        "boot": "250",
+        "value": "250",
+        "significantFigures": 3
+    },
+    {
+        "id": "injector-power",
+        "boot": "25",
+        "value": "25",
+        "significantFigures": 2
+    },
+    {
+        "id": "sensor-holding-time",
+        "boot": "150",
+        "value": "150",
+        "significantFigures": 3
+    }
+]

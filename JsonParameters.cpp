@@ -1,10 +1,12 @@
-#include "Parameters.h"
-
+#include "JsonParameters.h"
+#include "ArduinoJson-v6.19.4.h"
 #include <SPIFFS.h>
+
+#define JSON_DEFAULT_SIZE 4096
 
 Parameters::Parameters() {}
 
-void Parameters::setParametersJson() {
+String Parameters::getSerialized() { 
     File file = SPIFFS.open("/parameters.json");
 
     /* if (!file || file.isDirectory()) {
@@ -16,41 +18,56 @@ void Parameters::setParametersJson() {
     for (uint16_t i = 0; file.available(); i++)
         fileContent[i] = file.read();
 
-    _parametersJson = String(fileContent);
+    file.close();
+    return String(fileContent);
+}
 
-    DynamicJsonDocument parameters(1024);
-    deserializeJson(parameters, _parametersJson);  //, DeserializationOption::Filter(filter));
+void Parameters::loadParametersJson() {
+    String serializedParameters = getSerialized();
+
+    DynamicJsonDocument parameters(JSON_DEFAULT_SIZE);
+    deserializeJson(parameters, serializedParameters);  //, DeserializationOption::Filter(filter));
     _numberOfParameters = parameters.size();
+
+    uint8_t selectedSetup = parameters[0]["value"].as<uint8_t>();
 
     for (uint8_t parametersIndex = 0; parametersIndex < _numberOfParameters; parametersIndex++) {
         _parametersIds[parametersIndex] = parameters[parametersIndex]["id"].as<String>();
-        _parametersValues[parametersIndex] = parameters[parametersIndex]["value"].as<String>();
         _parametersTitles[parametersIndex] = parameters[parametersIndex]["title"].as<String>();
         _parametersSignificantFigures[parametersIndex] = parameters[parametersIndex]["significantFigures"].as<String>();
+    
+        if (parameters[parametersIndex].containsKey("value")) {
+            _parametersValues[parametersIndex] = parameters[parametersIndex]["value"].as<String>();
+        } else if (parameters[parametersIndex].containsKey("values")) {
+            _parametersValues[parametersIndex] = parameters[parametersIndex]["values"][selectedSetup].as<String>();
+        }
     }
 
     parameters.clear();
-    file.close();
 }
 
 void Parameters::saveParametersJson() {
-    DynamicJsonDocument parameters(1024);
+    String oldSerializedParameters = getSerialized();
+
+    DynamicJsonDocument parameters(JSON_DEFAULT_SIZE);
+    deserializeJson(parameters, oldSerializedParameters);
+    _numberOfParameters = parameters.size();
+
+    uint8_t selectedSetup = parameters[0]["value"].as<uint8_t>();
 
     for (uint8_t parametersIndex = 0; parametersIndex < _numberOfParameters; parametersIndex++) {
-        parameters[parametersIndex]["id"] = _parametersIds[parametersIndex];
-        parameters[parametersIndex]["value"] = _parametersValues[parametersIndex];
-        parameters[parametersIndex]["title"] = _parametersTitles[parametersIndex];
-        parameters[parametersIndex]["significantFigures"] = _parametersSignificantFigures[parametersIndex];
-
-        Serial.println(_parametersIds[parametersIndex]);
-        Serial.println(parameters[parametersIndex]["id"].as<String>());
+        if (parameters[parametersIndex].containsKey("value")) {
+            parameters[parametersIndex]["value"] = _parametersValues[parametersIndex];
+        } else if (parameters[parametersIndex].containsKey("values")) {
+            parameters[parametersIndex]["values"][selectedSetup] = _parametersValues[parametersIndex];
+        }
     }
 
-    String parametersJson;
-    serializeJson(parameters, parametersJson);
+    String newSerializedParamters;
+    serializeJson(parameters, newSerializedParamters);
 
     File file = SPIFFS.open("/parameters.json", "w+");
-    file.print(parametersJson);
+    file.print(newSerializedParamters);
 
     parameters.clear();
     file.close();
