@@ -1,12 +1,14 @@
 #include "JsonParameters.h"
-#include "ArduinoJson-v6.19.4.h"
+
 #include <SPIFFS.h>
+
+#include "ArduinoJson-v6.19.4.h"
 
 #define JSON_DEFAULT_SIZE 4096
 
 Parameters::Parameters() {}
 
-String Parameters::getSerialized() { 
+String Parameters::getSerialized() {
     File file = SPIFFS.open("/parameters.json");
 
     /* if (!file || file.isDirectory()) {
@@ -35,7 +37,9 @@ void Parameters::loadParametersJson() {
         _parametersIds[parametersIndex] = parameters[parametersIndex]["id"].as<String>();
         _parametersTitles[parametersIndex] = parameters[parametersIndex]["title"].as<String>();
         _parametersSignificantFigures[parametersIndex] = parameters[parametersIndex]["significantFigures"].as<String>();
-    
+        _parametersDecimalPlaces[parametersIndex] = parameters[parametersIndex].containsKey("decimalPlaces") ? parameters[parametersIndex]["decimalPlaces"].as<String>() : "0";
+        _parametersTypes[parametersIndex] = parameters[parametersIndex].containsKey("type") ? parameters[parametersIndex]["type"].as<String>() : "uint";
+
         if (parameters[parametersIndex].containsKey("value")) {
             _parametersValues[parametersIndex] = parameters[parametersIndex]["value"].as<String>();
         } else if (parameters[parametersIndex].containsKey("values")) {
@@ -61,6 +65,8 @@ void Parameters::saveParametersJson() {
         } else if (parameters[parametersIndex].containsKey("values")) {
             parameters[parametersIndex]["values"][selectedSetup] = _parametersValues[parametersIndex];
         }
+
+        parameters[parametersIndex]["significantFigures"] = _parametersSignificantFigures[parametersIndex];
     }
 
     String newSerializedParamters;
@@ -81,18 +87,26 @@ uint8_t Parameters::getParameterIndex(String id) {
     return 0;
 }
 
+String Parameters::getParameterValue(String id) {
+    return _parametersValues[getParameterIndex(id)];
+};
+
 void Parameters::increaseParameterValue(uint8_t parameterIndex, uint8_t position) {
-    uint8_t valueToIncrease = _parametersValues[parameterIndex].substring(position, position + 1).toInt();
+    uint8_t realPosition = position >= _parametersSignificantFigures[parameterIndex].toInt() - _parametersDecimalPlaces[parameterIndex].toInt() ? position + 1 : position;
+
+    uint8_t valueToIncrease = _parametersValues[parameterIndex].substring(realPosition, realPosition + 1).toInt();
     char increasedValue[1];
 
     itoa((valueToIncrease + 1) % 10, increasedValue, 10);
-    _parametersValues[parameterIndex].setCharAt(position, increasedValue[0]);
+    _parametersValues[parameterIndex].setCharAt(realPosition, increasedValue[0]);
 }
 
 void Parameters::decreaseParameterValue(uint8_t parameterIndex, uint8_t position) {
-    uint8_t valueToDecrease = _parametersValues[parameterIndex].substring(position, position + 1).toInt();
+    uint8_t realPosition = position >= _parametersSignificantFigures[parameterIndex].toInt() - _parametersDecimalPlaces[parameterIndex].toInt() ? position + 1 : position;
+
+    uint8_t valueToDecrease = _parametersValues[parameterIndex].substring(realPosition, realPosition + 1).toInt();
     char decreasedValue[1];
 
     itoa((valueToDecrease - 1) < 0 ? 9 : (valueToDecrease - 1), decreasedValue, 10);
-    _parametersValues[parameterIndex].setCharAt(position, decreasedValue[0]);
+    _parametersValues[parameterIndex].setCharAt(realPosition, decreasedValue[0]);
 }
