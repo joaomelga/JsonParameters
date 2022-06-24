@@ -25,7 +25,8 @@ class Parameters {
     void loadParametersJson();
     void saveParametersJson();
     void setParameterValue(uint8_t parameterIndex, String value) { _parametersValues[parameterIndex] = value; };
-    void setParameterSignificantValues(uint8_t parameterIndex, String significantFigures) { _parametersSignificantFigures[parameterIndex] = significantFigures; };
+    void setParameterSignificantFigures(uint8_t parameterIndex, uint8_t significantFigures);
+    void resetToBoot();
 
     uint8_t getParameterIndex(String id);
     uint8_t getParameterDecimalPlaces(uint8_t parameterIndex) { return (uint8_t)_parametersDecimalPlaces[parameterIndex].toInt(); };

@@ -92,21 +92,65 @@ String Parameters::getParameterValue(String id) {
 };
 
 void Parameters::increaseParameterValue(uint8_t parameterIndex, uint8_t position) {
-    uint8_t realPosition = position >= _parametersSignificantFigures[parameterIndex].toInt() - _parametersDecimalPlaces[parameterIndex].toInt() ? position + 1 : position;
-
-    uint8_t valueToIncrease = _parametersValues[parameterIndex].substring(realPosition, realPosition + 1).toInt();
+    uint8_t realPosition = position >= _parametersValues[parameterIndex].length() - !!_parametersDecimalPlaces[parameterIndex].toInt() - _parametersDecimalPlaces[parameterIndex].toInt() ? position + 1 : position;
+    String strValue = _parametersValues[parameterIndex].substring(realPosition, realPosition + 1);
     char increasedValue[1];
 
-    itoa((valueToIncrease + 1) % 10, increasedValue, 10);
+    if (strValue == "+" || strValue == "-") {
+        increasedValue[0] = strValue == "+" ? '-' : '+';
+    } else {
+        uint8_t valueToIncrease = strValue.toInt();
+        itoa((valueToIncrease + 1) % 10, increasedValue, 10);
+    }
+
     _parametersValues[parameterIndex].setCharAt(realPosition, increasedValue[0]);
 }
 
 void Parameters::decreaseParameterValue(uint8_t parameterIndex, uint8_t position) {
-    uint8_t realPosition = position >= _parametersSignificantFigures[parameterIndex].toInt() - _parametersDecimalPlaces[parameterIndex].toInt() ? position + 1 : position;
-
-    uint8_t valueToDecrease = _parametersValues[parameterIndex].substring(realPosition, realPosition + 1).toInt();
+    uint8_t realPosition = position >= _parametersValues[parameterIndex].length() - !!_parametersDecimalPlaces[parameterIndex].toInt() - _parametersDecimalPlaces[parameterIndex].toInt() ? position + 1 : position;
+    String strValue = _parametersValues[parameterIndex].substring(realPosition, realPosition + 1);
     char decreasedValue[1];
 
-    itoa((valueToDecrease - 1) < 0 ? 9 : (valueToDecrease - 1), decreasedValue, 10);
+    if (strValue == "+" || strValue == "-") {
+        decreasedValue[0] = strValue == "+" ? '-' : '+';
+    } else {
+        uint8_t valueToDecrease = strValue.toInt();
+        itoa((valueToDecrease - 1) < 0 ? 9 : (valueToDecrease - 1), decreasedValue, 10);
+    }
+
     _parametersValues[parameterIndex].setCharAt(realPosition, decreasedValue[0]);
+}
+
+void Parameters::setParameterSignificantFigures(uint8_t parameterIndex, uint8_t significantFigures) {
+    uint8_t previousSignificantFigures = _parametersSignificantFigures[parameterIndex].toInt();
+    String parameterValue = _parametersValues[parameterIndex];
+    String unsignedValue;
+    unsignedValue = parameterValue.substring(parameterValue[0] != '+' && parameterValue[0] != '-' ? 0 : 1);
+
+    if (significantFigures < previousSignificantFigures) {
+        for (uint8_t i = 0; i < previousSignificantFigures - significantFigures; i++)
+            unsignedValue = unsignedValue.substring(1);
+    } else if (significantFigures > previousSignificantFigures) {
+        for (uint8_t i = 0; i < significantFigures - previousSignificantFigures; i++)
+            unsignedValue = "0" + unsignedValue;
+    } else
+        return;
+
+    parameterValue = (parameterValue[0] != '+' && parameterValue[0] != '-') ? unsignedValue : parameterValue[0] + unsignedValue;
+    _parametersValues[parameterIndex] = parameterValue;
+    _parametersSignificantFigures[parameterIndex] = String(significantFigures);
+};
+
+void Parameters::resetToBoot() {
+    File bootFile = SPIFFS.open("/parameters.boot.json");
+    char bootFileContent[bootFile.size()];
+
+    for (uint16_t i = 0; bootFile.available(); i++)
+        bootFileContent[i] = bootFile.read();
+
+    bootFile.close();
+
+    File defaultFile = SPIFFS.open("/parameters.json", "w+");
+    defaultFile.print(bootFileContent);
+    defaultFile.close();
 }
