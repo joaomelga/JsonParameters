@@ -36,9 +36,11 @@ void Parameters::loadParametersJson() {
     for (uint8_t parametersIndex = 0; parametersIndex < _numberOfParameters; parametersIndex++) {
         _parametersIds[parametersIndex] = parameters[parametersIndex]["id"].as<String>();
         _parametersTitles[parametersIndex] = parameters[parametersIndex]["title"].as<String>();
-        _parametersSignificantFigures[parametersIndex] = parameters[parametersIndex]["significantFigures"].as<String>();
-        _parametersDecimalPlaces[parametersIndex] = parameters[parametersIndex].containsKey("decimalPlaces") ? parameters[parametersIndex]["decimalPlaces"].as<String>() : "0";
         _parametersTypes[parametersIndex] = parameters[parametersIndex].containsKey("type") ? parameters[parametersIndex]["type"].as<String>() : "uint";
+        _parametersSignificantFigures[parametersIndex] = parameters[parametersIndex].containsKey("significantFigures") ? parameters[parametersIndex]["significantFigures"].as<uint8_t>() : 0;
+        _parametersDecimalPlaces[parametersIndex] = parameters[parametersIndex].containsKey("decimalPlaces") ? parameters[parametersIndex]["decimalPlaces"].as<uint8_t>() : 0;
+        _parametersMax[parametersIndex] = parameters[parametersIndex].containsKey("max") ? parameters[parametersIndex]["max"].as<uint>() : UINT_MAX;
+        _parametersMin[parametersIndex] = parameters[parametersIndex].containsKey("min") ? parameters[parametersIndex]["min"].as<uint>() : 0;
 
         if (parameters[parametersIndex].containsKey("value")) {
             _parametersValues[parametersIndex] = parameters[parametersIndex]["value"].as<String>();
@@ -48,6 +50,7 @@ void Parameters::loadParametersJson() {
     }
 
     parameters.clear();
+    _updateFlag = true;
 }
 
 void Parameters::saveParametersJson() {
@@ -66,6 +69,7 @@ void Parameters::saveParametersJson() {
             parameters[parametersIndex]["values"][selectedSetup] = _parametersValues[parametersIndex];
         }
 
+        parameters[parametersIndex]["decimalPlaces"] = _parametersDecimalPlaces[parametersIndex];
         parameters[parametersIndex]["significantFigures"] = _parametersSignificantFigures[parametersIndex];
     }
 
@@ -77,6 +81,19 @@ void Parameters::saveParametersJson() {
 
     parameters.clear();
     file.close();
+}
+
+void Parameters::applyLimits(uint8_t parameterIndex) {
+    uint8_t significantFigures = _parametersSignificantFigures[parameterIndex];
+    char limitedValue[significantFigures];
+    
+    if (_parametersValues[parameterIndex].toInt() > _parametersMax[parameterIndex]) {
+        sprintf(limitedValue, "%.*d", significantFigures, _parametersMax[parameterIndex]);
+        _parametersValues[parameterIndex] = limitedValue;
+    } else if (_parametersValues[parameterIndex].toInt() < _parametersMin[parameterIndex]) {
+        sprintf(limitedValue, "%.*d", significantFigures, _parametersMin[parameterIndex]);
+        _parametersValues[parameterIndex] = limitedValue;
+    }
 }
 
 uint8_t Parameters::getParameterIndex(String id) {
@@ -92,7 +109,7 @@ String Parameters::getParameterValue(String id) {
 };
 
 void Parameters::increaseParameterValue(uint8_t parameterIndex, uint8_t position) {
-    uint8_t realPosition = position >= _parametersValues[parameterIndex].length() - !!_parametersDecimalPlaces[parameterIndex].toInt() - _parametersDecimalPlaces[parameterIndex].toInt() ? position + 1 : position;
+    uint8_t realPosition = position >= _parametersValues[parameterIndex].length() - !!_parametersDecimalPlaces[parameterIndex] - _parametersDecimalPlaces[parameterIndex] ? position + 1 : position;
     String strValue = _parametersValues[parameterIndex].substring(realPosition, realPosition + 1);
     char increasedValue[1];
 
@@ -104,10 +121,12 @@ void Parameters::increaseParameterValue(uint8_t parameterIndex, uint8_t position
     }
 
     _parametersValues[parameterIndex].setCharAt(realPosition, increasedValue[0]);
+    applyLimits(parameterIndex);
+    _updateFlag = true;
 }
 
 void Parameters::decreaseParameterValue(uint8_t parameterIndex, uint8_t position) {
-    uint8_t realPosition = position >= _parametersValues[parameterIndex].length() - !!_parametersDecimalPlaces[parameterIndex].toInt() - _parametersDecimalPlaces[parameterIndex].toInt() ? position + 1 : position;
+    uint8_t realPosition = position >= _parametersValues[parameterIndex].length() - !!_parametersDecimalPlaces[parameterIndex] - _parametersDecimalPlaces[parameterIndex] ? position + 1 : position;
     String strValue = _parametersValues[parameterIndex].substring(realPosition, realPosition + 1);
     char decreasedValue[1];
 
@@ -119,10 +138,33 @@ void Parameters::decreaseParameterValue(uint8_t parameterIndex, uint8_t position
     }
 
     _parametersValues[parameterIndex].setCharAt(realPosition, decreasedValue[0]);
+    applyLimits(parameterIndex);
+    _updateFlag = true;
+}
+
+void Parameters::setParameterDecimalPlaces(uint8_t parameterIndex, uint8_t decimalPlaces) {
+    uint8_t previousDecimalPlaces = _parametersDecimalPlaces[parameterIndex];
+    String parameterValue = _parametersValues[parameterIndex];
+    String unsignedValue;
+    unsignedValue = parameterValue.substring(parameterValue[0] != '+' && parameterValue[0] != '-' ? 0 : 1);
+
+    if (decimalPlaces < previousDecimalPlaces) {
+        for (uint8_t i = 0; i < !!(previousDecimalPlaces > 0 && decimalPlaces == 0) + previousDecimalPlaces - decimalPlaces; i++)
+            unsignedValue = unsignedValue.substring(0, unsignedValue.length() - 1);
+    } else if (decimalPlaces > previousDecimalPlaces) {
+        if (previousDecimalPlaces == 0 && decimalPlaces > 0) unsignedValue += ".";
+        for (uint8_t i = 0; i < decimalPlaces - previousDecimalPlaces; i++) unsignedValue += "0";
+    } else
+        return;
+
+    parameterValue = (parameterValue[0] != '+' && parameterValue[0] != '-') ? unsignedValue : parameterValue[0] + unsignedValue;
+    _parametersValues[parameterIndex] = parameterValue;
+    _parametersDecimalPlaces[parameterIndex] = decimalPlaces;
+    _updateFlag = true;
 }
 
 void Parameters::setParameterSignificantFigures(uint8_t parameterIndex, uint8_t significantFigures) {
-    uint8_t previousSignificantFigures = _parametersSignificantFigures[parameterIndex].toInt();
+    uint8_t previousSignificantFigures = _parametersSignificantFigures[parameterIndex];
     String parameterValue = _parametersValues[parameterIndex];
     String unsignedValue;
     unsignedValue = parameterValue.substring(parameterValue[0] != '+' && parameterValue[0] != '-' ? 0 : 1);
@@ -138,8 +180,9 @@ void Parameters::setParameterSignificantFigures(uint8_t parameterIndex, uint8_t 
 
     parameterValue = (parameterValue[0] != '+' && parameterValue[0] != '-') ? unsignedValue : parameterValue[0] + unsignedValue;
     _parametersValues[parameterIndex] = parameterValue;
-    _parametersSignificantFigures[parameterIndex] = String(significantFigures);
-};
+    _parametersSignificantFigures[parameterIndex] = significantFigures;
+    _updateFlag = true;
+}
 
 void Parameters::resetToBoot() {
     File bootFile = SPIFFS.open("/parameters.boot.json");
@@ -153,4 +196,5 @@ void Parameters::resetToBoot() {
     File defaultFile = SPIFFS.open("/parameters.json", "w+");
     defaultFile.print(bootFileContent);
     defaultFile.close();
+    _updateFlag = true;
 }
